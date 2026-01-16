@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Linux.do 自动滚动阅读助手
 // @namespace    http://tampermonkey.net/
-// @version      1.5.0
-// @description  为 linux.do 论坛添加自动滚动功能，支持速度调节、暂停/继续、智能处理 Discourse 懒加载、可拖拽浮动面板，图标样式最小化
+// @version      1.5.1
+// @description  为 linux.do 论坛添加自动滚动功能，支持速度调节、暂停/继续、智能处理 Discourse 懒加载、可拖拽浮动面板，图标样式最小化，运行状态显示
 // @author       pboy
 // @match        https://linux.do/t/*
 // @match        https://linux.do/*
@@ -146,6 +146,10 @@
                 cursor: pointer;
             }
 
+            #linuxdo-autoscroll-panel.minimized.scrolling {
+                background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            }
+
             #linuxdo-autoscroll-panel.minimized .autoscroll-content {
                 display: none;
             }
@@ -245,6 +249,7 @@
     function makeDraggable(panel) {
         const header = panel.querySelector('.autoscroll-header');
         let isDragging = false;
+        let hasMoved = false; // 是否真正拖动过（有位移）
         let currentX;
         let currentY;
         let initialX;
@@ -263,6 +268,7 @@
             initialX = e.clientX - xOffset;
             initialY = e.clientY - yOffset;
             isDragging = true;
+            hasMoved = false;
         }
 
         function drag(e) {
@@ -270,6 +276,12 @@
                 e.preventDefault();
                 currentX = e.clientX - initialX;
                 currentY = e.clientY - initialY;
+
+                // 检测是否有实际位移
+                if (Math.abs(currentX) > 3 || Math.abs(currentY) > 3) {
+                    hasMoved = true;
+                }
+
                 xOffset = currentX;
                 yOffset = currentY;
                 setTranslate(currentX, currentY, panel);
@@ -280,18 +292,28 @@
             initialX = currentX;
             initialY = currentY;
             isDragging = false;
+
+            // 如果拖动过，延迟重置标志，防止触发单击事件
+            if (hasMoved) {
+                setTimeout(() => {
+                    hasMoved = false;
+                }, 100);
+            }
         }
 
         function setTranslate(xPos, yPos, el) {
             el.style.transform = `translate(${xPos}px, ${yPos}px)`;
         }
+
+        // 返回检查函数
+        return () => hasMoved;
     }
 
     // 初始化控制面板
     const panel = createControlPanel();
 
-    // 添加拖拽功能
-    makeDraggable(panel);
+    // 添加拖拽功能，并获取检查函数
+    const hasRecentlyDragged = makeDraggable(panel);
 
     // 最小化按钮
     const minimizeBtn = document.getElementById('autoscroll-minimize');
@@ -314,6 +336,11 @@
 
     // 单击标题栏在最小化状态下展开
     header.addEventListener('click', (e) => {
+        // 如果刚刚拖动过，不展开
+        if (hasRecentlyDragged()) {
+            return;
+        }
+
         if (panel.classList.contains('minimized') && e.target !== minimizeBtn) {
             panel.classList.remove('minimized');
             minimizeBtn.textContent = '−';
@@ -346,6 +373,9 @@
         toggleBtn.style.background = '#ff6b6b';
         toggleBtn.style.color = 'white';
         statusDiv.textContent = '正在滚动...';
+
+        // 最小化状态时显示绿色
+        panel.classList.add('scrolling');
 
         // 平滑加速到目标速度
         smoothScrollInterval = setInterval(() => {
@@ -404,6 +434,9 @@
         toggleBtn.style.background = 'white';
         toggleBtn.style.color = '#667eea';
         statusDiv.textContent = '已暂停';
+
+        // 移除绿色，恢复默认颜色
+        panel.classList.remove('scrolling');
 
         clearInterval(scrollInterval);
         clearInterval(smoothScrollInterval);
