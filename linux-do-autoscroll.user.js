@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Linux.do 自动滚动阅读助手
 // @namespace    http://tampermonkey.net/
-// @version      1.3.0
-// @description  为 linux.do 论坛添加自动滚动功能，支持速度调节、暂停/继续、智能处理 Discourse 懒加载
-// @author       You
+// @version      1.5.0
+// @description  为 linux.do 论坛添加自动滚动功能，支持速度调节、暂停/继续、智能处理 Discourse 懒加载、可拖拽浮动面板，图标样式最小化
+// @author       pboy
 // @match        https://linux.do/t/*
 // @match        https://linux.do/*
 // @grant        GM_addStyle
@@ -15,7 +15,7 @@
 
     // ========== 配置选项 ==========
     const CONFIG = {
-        INITIAL_SPEED: 2,           // 初始速度（像素/帧）
+        INITIAL_SPEED: 7,           // 初始速度（像素/帧）
         MIN_SPEED: 0.5,             // 最小速度
         MAX_SPEED: 10,              // 最大速度
         BOTTOM_THRESHOLD: 100,      // 距离底部多少像素视为到达底部
@@ -38,18 +38,27 @@
     function createControlPanel() {
         const panel = document.createElement('div');
         panel.id = 'linuxdo-autoscroll-panel';
+        panel.classList.add('minimized'); // 默认最小化
         panel.innerHTML = `
-            <div class="autoscroll-title">📖 自动滚动助手</div>
-            <button id="autoscroll-toggle" class="autoscroll-btn autoscroll-btn-primary">
-                ▶️ 开始滚动
-            </button>
-            <div class="autoscroll-controls">
-                <div class="autoscroll-speed-control">
-                    <label>速度: <span id="speed-value">${CONFIG.INITIAL_SPEED}</span></label>
-                    <input type="range" id="autoscroll-speed" min="${CONFIG.MIN_SPEED}" max="${CONFIG.MAX_SPEED}" step="0.5" value="${CONFIG.INITIAL_SPEED}">
-                </div>
+            <div class="autoscroll-header" id="autoscroll-header">
+                <span class="autoscroll-title">
+                    <span class="autoscroll-icon">📖</span>
+                    <span class="autoscroll-text">自动滚动助手</span>
+                </span>
+                <button class="autoscroll-minimize-btn" id="autoscroll-minimize" title="最小化">−</button>
             </div>
-            <div class="autoscroll-status" id="autoscroll-status">就绪</div>
+            <div class="autoscroll-content">
+                <button id="autoscroll-toggle" class="autoscroll-btn autoscroll-btn-primary">
+                    ▶️ 开始滚动
+                </button>
+                <div class="autoscroll-controls">
+                    <div class="autoscroll-speed-control">
+                        <label>速度: <span id="speed-value">${CONFIG.INITIAL_SPEED}</span></label>
+                        <input type="range" id="autoscroll-speed" min="${CONFIG.MIN_SPEED}" max="${CONFIG.MAX_SPEED}" step="0.5" value="${CONFIG.INITIAL_SPEED}">
+                    </div>
+                </div>
+                <div class="autoscroll-status" id="autoscroll-status">就绪</div>
+            </div>
         `;
 
         // 添加样式
@@ -59,7 +68,7 @@
                 top: 100px;
                 right: 20px;
                 background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                padding: 15px;
+                padding: 0;
                 border-radius: 12px;
                 box-shadow: 0 8px 32px rgba(0,0,0,0.3);
                 z-index: 99999;
@@ -67,6 +76,7 @@
                 color: white;
                 min-width: 200px;
                 transition: all 0.3s ease;
+                cursor: move;
             }
 
             #linuxdo-autoscroll-panel:hover {
@@ -74,13 +84,92 @@
                 box-shadow: 0 12px 40px rgba(0,0,0,0.4);
             }
 
+            .autoscroll-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 12px 15px;
+                border-bottom: 1px solid rgba(255,255,255,0.3);
+                cursor: move;
+                user-select: none;
+            }
+
             .autoscroll-title {
                 font-size: 14px;
                 font-weight: bold;
-                margin-bottom: 12px;
-                text-align: center;
-                padding-bottom: 8px;
-                border-bottom: 1px solid rgba(255,255,255,0.3);
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+
+            .autoscroll-icon {
+                font-size: 16px;
+            }
+
+            #linuxdo-autoscroll-panel.minimized .autoscroll-text {
+                display: none;
+            }
+
+            .autoscroll-minimize-btn {
+                width: 24px;
+                height: 24px;
+                border: none;
+                background: rgba(255,255,255,0.2);
+                color: white;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 18px;
+                line-height: 1;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s ease;
+            }
+
+            .autoscroll-minimize-btn:hover {
+                background: rgba(255,255,255,0.3);
+                transform: scale(1.1);
+            }
+
+            .autoscroll-content {
+                padding: 15px;
+                transition: all 0.3s ease;
+            }
+
+            #linuxdo-autoscroll-panel.minimized {
+                min-width: auto;
+                width: 50px;
+                height: 50px;
+                padding: 0;
+                border-radius: 50%;
+                cursor: pointer;
+            }
+
+            #linuxdo-autoscroll-panel.minimized .autoscroll-content {
+                display: none;
+            }
+
+            #linuxdo-autoscroll-panel.minimized .autoscroll-header {
+                border-bottom: none;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                cursor: pointer;
+            }
+
+            #linuxdo-autoscroll-panel.minimized .autoscroll-title {
+                font-size: 28px;
+            }
+
+            #linuxdo-autoscroll-panel.minimized .autoscroll-icon {
+                font-size: 28px;
+            }
+
+            #linuxdo-autoscroll-panel.minimized .autoscroll-minimize-btn {
+                display: none;
             }
 
             .autoscroll-btn {
@@ -146,34 +235,90 @@
                 padding-top: 8px;
                 border-top: 1px solid rgba(255,255,255,0.2);
             }
-
-            #linuxdo-autoscroll-panel.minimized {
-                min-width: auto;
-                padding: 10px 15px;
-                cursor: pointer;
-            }
-
-            #linuxdo-autoscroll-panel.minimized .autoscroll-title {
-                border-bottom: none;
-                margin-bottom: 0;
-                padding-bottom: 0;
-            }
-
-            #linuxdo-autoscroll-panel.minimized > *:not(.autoscroll-title) {
-                display: none;
-            }
         `);
 
         document.body.appendChild(panel);
         return panel;
     }
 
+    // 添加拖拽功能
+    function makeDraggable(panel) {
+        const header = panel.querySelector('.autoscroll-header');
+        let isDragging = false;
+        let currentX;
+        let currentY;
+        let initialX;
+        let initialY;
+        let xOffset = 0;
+        let yOffset = 0;
+
+        header.addEventListener('mousedown', dragStart);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', dragEnd);
+
+        function dragStart(e) {
+            if (e.target.classList.contains('autoscroll-minimize-btn')) {
+                return; // 如果点击的是最小化按钮，不拖拽
+            }
+            initialX = e.clientX - xOffset;
+            initialY = e.clientY - yOffset;
+            isDragging = true;
+        }
+
+        function drag(e) {
+            if (isDragging) {
+                e.preventDefault();
+                currentX = e.clientX - initialX;
+                currentY = e.clientY - initialY;
+                xOffset = currentX;
+                yOffset = currentY;
+                setTranslate(currentX, currentY, panel);
+            }
+        }
+
+        function dragEnd(e) {
+            initialX = currentX;
+            initialY = currentY;
+            isDragging = false;
+        }
+
+        function setTranslate(xPos, yPos, el) {
+            el.style.transform = `translate(${xPos}px, ${yPos}px)`;
+        }
+    }
+
     // 初始化控制面板
     const panel = createControlPanel();
 
-    // 双击标题栏最小化/展开
-    panel.querySelector('.autoscroll-title').addEventListener('dblclick', () => {
+    // 添加拖拽功能
+    makeDraggable(panel);
+
+    // 最小化按钮
+    const minimizeBtn = document.getElementById('autoscroll-minimize');
+    minimizeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
         panel.classList.toggle('minimized');
+        minimizeBtn.textContent = panel.classList.contains('minimized') ? '+' : '−';
+        minimizeBtn.title = panel.classList.contains('minimized') ? '展开' : '最小化';
+    });
+
+    // 双击标题栏也可以最小化/展开
+    const header = document.getElementById('autoscroll-header');
+    header.addEventListener('dblclick', (e) => {
+        if (e.target !== minimizeBtn) {
+            panel.classList.toggle('minimized');
+            minimizeBtn.textContent = panel.classList.contains('minimized') ? '+' : '−';
+            minimizeBtn.title = panel.classList.contains('minimized') ? '展开' : '最小化';
+        }
+    });
+
+    // 单击标题栏在最小化状态下展开
+    header.addEventListener('click', (e) => {
+        if (panel.classList.contains('minimized') && e.target !== minimizeBtn) {
+            panel.classList.remove('minimized');
+            minimizeBtn.textContent = '−';
+            minimizeBtn.title = '最小化';
+        }
     });
 
     // 获取元素
