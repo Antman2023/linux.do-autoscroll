@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Linux.do 自动滚动阅读助手
 // @namespace    http://tampermonkey.net/
-// @version      1.5.1
+// @version      1.5.2
 // @description  为 linux.do 论坛添加自动滚动功能，支持速度调节、暂停/继续、智能处理 Discourse 懒加载、可拖拽浮动面板，图标样式最小化，运行状态显示
 // @author       pboy
 // @match        https://linux.do/t/*
@@ -103,14 +103,12 @@
     // ==============================
 
     let isScrolling = false;
-    let scrollSpeed = CONFIG.INITIAL_SPEED;
-    let scrollInterval = null;
+    let scrollRafId = null;
     let targetSpeed = 2;
     let currentSpeed = 0;
-    let smoothScrollInterval = null;
-    let bottomDetectionCount = 0; // 底部检测计数器
     let lastScrollHeight = 0; // 记录上次的页面高度
     let noChangeCount = 0; // 页面高度未变化的计数器
+    let lastFrameTime = 0; // 上一帧时间
 
     // 创建控制面板
     function createControlPanel(settings) {
@@ -277,14 +275,6 @@
                 cursor: pointer;
             }
 
-            #linuxdo-autoscroll-panel.minimized .autoscroll-title {
-                font-size: 20px;
-            }
-
-            #linuxdo-autoscroll-panel.minimized .autoscroll-icon {
-                font-size: 20px;
-            }
-
             #linuxdo-autoscroll-panel.minimized .autoscroll-minimize-btn {
                 display: none;
             }
@@ -392,10 +382,10 @@
 
         let isDragging = false;
         let hasMoved = false; // 是否真正拖动过（有位移）
-        let currentX;
-        let currentY;
-        let initialX;
-        let initialY;
+        let currentX = 0;
+        let currentY = 0;
+        let initialX = 0;
+        let initialY = 0;
         let xOffset = settings.position.x;  // 从保存的设置初始化
         let yOffset = settings.position.y;  // 从保存的设置初始化
 
@@ -571,32 +561,34 @@
     // 添加拖拽功能，并获取 API 对象
     const dragAPI = makeDraggable(panel, settings);
 
+    // 切换最小化状态
+    function toggleMinimize(forceState = null) {
+        const isMinimized = forceState !== null ? forceState : !panel.classList.contains('minimized');
+
+        if (isMinimized) {
+            panel.classList.add('minimized');
+        } else {
+            panel.classList.remove('minimized');
+        }
+
+        minimizeBtn.textContent = isMinimized ? '+' : '−';
+        minimizeBtn.title = isMinimized ? '展开' : '最小化';
+        settings.isMinimized = isMinimized;
+        StorageManager.save(settings);
+    }
+
     // 最小化按钮
     const minimizeBtn = document.getElementById('autoscroll-minimize');
     minimizeBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        panel.classList.toggle('minimized');
-        const isMinimized = panel.classList.contains('minimized');
-        minimizeBtn.textContent = isMinimized ? '+' : '−';
-        minimizeBtn.title = isMinimized ? '展开' : '最小化';
-
-        // 立即保存最小化状态
-        settings.isMinimized = isMinimized;
-        StorageManager.save(settings);
+        toggleMinimize();
     });
 
     // 双击标题栏也可以最小化/展开
     const header = document.getElementById('autoscroll-header');
     header.addEventListener('dblclick', (e) => {
         if (e.target !== minimizeBtn) {
-            panel.classList.toggle('minimized');
-            const isMinimized = panel.classList.contains('minimized');
-            minimizeBtn.textContent = isMinimized ? '+' : '−';
-            minimizeBtn.title = isMinimized ? '展开' : '最小化';
-
-            // 立即保存最小化状态
-            settings.isMinimized = isMinimized;
-            StorageManager.save(settings);
+            toggleMinimize();
         }
     });
 
@@ -608,13 +600,7 @@
         }
 
         if (panel.classList.contains('minimized') && e.target !== minimizeBtn) {
-            panel.classList.remove('minimized');
-            minimizeBtn.textContent = '−';
-            minimizeBtn.title = '最小化';
-
-            // 立即保存最小化状态
-            settings.isMinimized = false;
-            StorageManager.save(settings);
+            toggleMinimize(false);
         }
     });
 
@@ -643,9 +629,9 @@
     // 开始滚动
     function startScroll() {
         isScrolling = true;
-        bottomDetectionCount = 0; // 重置底部计数
         noChangeCount = 0; // 重置无变化计数
         lastScrollHeight = document.documentElement.scrollHeight; // 初始化高度
+        lastFrameTime = performance.now();
         toggleBtn.textContent = '⏸️ 暂停滚动';
         toggleBtn.style.background = '#ff6b6b';
         toggleBtn.style.color = 'white';
@@ -654,17 +640,20 @@
         // 最小化状态时显示绿色
         panel.classList.add('scrolling');
 
-        // 平滑加速到目标速度
-        smoothScrollInterval = setInterval(() => {
+        // 滚动动画
+        function scrollLoop(timestamp) {
+            if (!isScrolling) return;
+
+            const deltaTime = timestamp - lastFrameTime;
+            lastFrameTime = timestamp;
+
+            // 平滑加速到目标速度
             if (currentSpeed < targetSpeed) {
                 currentSpeed = Math.min(currentSpeed + 0.1, targetSpeed);
             } else if (currentSpeed > targetSpeed) {
                 currentSpeed = Math.max(currentSpeed - 0.1, targetSpeed);
             }
-        }, 50);
 
-        // 执行滚动
-        scrollInterval = setInterval(() => {
             const scrollHeight = document.documentElement.scrollHeight;
             const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
             const clientHeight = document.documentElement.clientHeight;
@@ -672,8 +661,6 @@
 
             // 检测页面高度是否变化（Discourse懒加载新内容）
             if (scrollHeight > lastScrollHeight) {
-                // 页面高度增长，说明新内容已加载
-                const addedPosts = Math.floor((scrollHeight - lastScrollHeight) / 200); // 估算新增帖子数
                 statusDiv.textContent = `加载新内容...`;
                 noChangeCount = 0; // 重置无变化计数
             } else if (distanceToBottom < CONFIG.BOTTOM_THRESHOLD) {
@@ -701,7 +688,11 @@
 
             // 继续滚动（即使到达底部也继续滚动，以触发懒加载）
             window.scrollBy(0, currentSpeed);
-        }, 16); // 约60fps
+
+            scrollRafId = requestAnimationFrame(scrollLoop);
+        }
+
+        scrollRafId = requestAnimationFrame(scrollLoop);
     }
 
     // 停止滚动
@@ -715,8 +706,10 @@
         // 移除绿色，恢复默认颜色
         panel.classList.remove('scrolling');
 
-        clearInterval(scrollInterval);
-        clearInterval(smoothScrollInterval);
+        if (scrollRafId !== null) {
+            cancelAnimationFrame(scrollRafId);
+            scrollRafId = null;
+        }
         currentSpeed = 0;
     }
 
@@ -763,20 +756,6 @@
             debouncedSaveSettings(settings);
         }
     });
-
-    // 自动跳转到下一个帖子（可选功能）
-    function autoNextPost() {
-        // 查找"下一话题"按钮
-        const nextButton = document.querySelector('.topic-footer-buttons .next') ||
-                          document.querySelector('a[href*="/next"]');
-
-        if (nextButton) {
-            statusDiv.textContent = '跳转到下一个帖子...';
-            setTimeout(() => {
-                window.location.href = nextButton.href;
-            }, 2000);
-        }
-    }
 
     // 监听页面可见性变化（根据配置决定是否启用）
     if (CONFIG.AUTO_PAUSE_ON_HIDE) {
