@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Linux.do 自动滚动阅读助手
 // @namespace    http://tampermonkey.net/
-// @version      1.5.2
+// @version      1.5.3
 // @description  为 linux.do 论坛添加自动滚动功能，支持速度调节、暂停/继续、智能处理 Discourse 懒加载、可拖拽浮动面板，图标样式最小化，运行状态显示
 // @author       pboy
 // @match        https://linux.do/t/*
@@ -143,7 +143,7 @@
                 position: fixed;
                 top: 100px;
                 right: 20px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: #2d2d2d;
                 padding: 0;
                 border-radius: 12px;
                 box-shadow: 0 8px 32px rgba(0,0,0,0.3);
@@ -240,23 +240,19 @@
             }
 
             #linuxdo-autoscroll-panel.minimized.scrolling {
-                background: linear-gradient(135deg, #4e76ff 0%, #6b5bff 35%, #38d4ff 70%, #7b5cff 100%);
-                background-size: 300% 300%;
+                background: #2d2d2d;
                 animation: linuxdo-autoscroll-pulse 1.4s ease-in-out infinite;
             }
 
             @keyframes linuxdo-autoscroll-pulse {
                 0% {
-                    background-position: 0% 50%;
-                    box-shadow: 0 0 10px rgba(78,118,255,0.3);
+                    box-shadow: 0 0 10px rgba(255,255,255,0.1);
                 }
                 50% {
-                    background-position: 100% 50%;
-                    box-shadow: 0 0 28px rgba(56,212,255,0.6);
+                    box-shadow: 0 0 20px rgba(255,255,255,0.3);
                 }
                 100% {
-                    background-position: 0% 50%;
-                    box-shadow: 0 0 10px rgba(123,92,255,0.3);
+                    box-shadow: 0 0 10px rgba(255,255,255,0.1);
                 }
             }
 
@@ -293,7 +289,7 @@
 
             .autoscroll-btn-primary {
                 background: white;
-                color: #667eea;
+                color: #2d2d2d;
             }
 
             .autoscroll-btn-primary:hover {
@@ -700,7 +696,7 @@
         isScrolling = false;
         toggleBtn.textContent = '▶️ 继续滚动';
         toggleBtn.style.background = 'white';
-        toggleBtn.style.color = '#667eea';
+        toggleBtn.style.color = '#2d2d2d';
         statusDiv.textContent = '已暂停';
 
         // 移除绿色，恢复默认颜色
