@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Linux.do 自动滚动阅读助手
 // @namespace    http://tampermonkey.net/
-// @version      1.5.3
+// @version      1.5.4
 // @description  为 linux.do 论坛添加自动滚动功能，支持速度调节、暂停/继续、智能处理 Discourse 懒加载、可拖拽浮动面板，图标样式最小化，运行状态显示
 // @author       pboy
 // @match        https://linux.do/t/*
@@ -143,7 +143,7 @@
                 position: fixed;
                 top: 100px;
                 right: 20px;
-                background: #2d2d2d;
+                background: #ff7b00;
                 padding: 0;
                 border-radius: 12px;
                 box-shadow: 0 8px 32px rgba(0,0,0,0.3);
@@ -154,6 +154,8 @@
                 transition: all 0.3s ease;
                 cursor: move;
                 will-change: transform;
+                --tx: 0;
+                --ty: 0;
             }
 
             #linuxdo-autoscroll-panel:hover {
@@ -165,6 +167,7 @@
                 transition: none;
                 box-shadow: 0 8px 32px rgba(0,0,0,0.3);
                 transform: none;
+                animation: none !important;
             }
 
 
@@ -240,19 +243,16 @@
             }
 
             #linuxdo-autoscroll-panel.minimized.scrolling {
-                background: #2d2d2d;
+                background: #ff7b00;
                 animation: linuxdo-autoscroll-pulse 1.4s ease-in-out infinite;
             }
 
             @keyframes linuxdo-autoscroll-pulse {
-                0% {
-                    box-shadow: 0 0 10px rgba(255,255,255,0.1);
+                0%, 100% {
+                    transform: translate(var(--tx, 0), var(--ty, 0)) scale(1);
                 }
                 50% {
-                    box-shadow: 0 0 20px rgba(255,255,255,0.3);
-                }
-                100% {
-                    box-shadow: 0 0 10px rgba(255,255,255,0.1);
+                    transform: translate(var(--tx, 0), var(--ty, 0)) scale(1.15);
                 }
             }
 
@@ -344,6 +344,8 @@
 
         // 应用保存的位置
         if (settings.position.x !== 0 || settings.position.y !== 0) {
+            panel.style.setProperty('--tx', `${settings.position.x}px`);
+            panel.style.setProperty('--ty', `${settings.position.y}px`);
             panel.style.transform = `translate(${settings.position.x}px, ${settings.position.y}px)`;
         }
 
@@ -530,6 +532,8 @@
 
 
         function setTranslate(xPos, yPos, el) {
+            el.style.setProperty('--tx', `${xPos}px`);
+            el.style.setProperty('--ty', `${yPos}px`);
             el.style.transform = `translate(${xPos}px, ${yPos}px)`;
         }
 
