@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Linux.do 自动滚动阅读助手
 // @namespace    http://tampermonkey.net/
-// @version      1.5.4
-// @description  为 linux.do 论坛添加自动滚动功能，支持速度调节、暂停/继续、智能处理 Discourse 懒加载、可拖拽浮动面板，图标样式最小化，运行状态显示
+// @version      1.6.0
+// @description  为 linux.do 论坛添加自动滚动功能，支持速度调节、暂停/继续、智能处理 Discourse 懒加载、可拖拽浮动面板，毛玻璃风格，跟随论坛主题配色
 // @author       pboy
 // @match        https://linux.do/t/*
 // @match        https://linux.do/*
@@ -118,18 +118,30 @@
         panel.innerHTML = `
             <div class="autoscroll-header" id="autoscroll-header">
                 <span class="autoscroll-title">
-                    <span class="autoscroll-icon">📖</span>
-                    <span class="autoscroll-text">自动滚动助手</span>
+                    <span class="autoscroll-icon">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="17 1 21 5 17 9"></polyline>
+                            <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
+                            <polyline points="7 23 3 19 7 15"></polyline>
+                            <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
+                        </svg>
+                    </span>
+                    <span class="autoscroll-text">自动滚动</span>
                 </span>
-                <button class="autoscroll-minimize-btn" id="autoscroll-minimize" title="最小化">−</button>
+                <button class="autoscroll-minimize-btn" id="autoscroll-minimize" title="最小化">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
             </div>
             <div class="autoscroll-content">
                 <button id="autoscroll-toggle" class="autoscroll-btn autoscroll-btn-primary">
-                    ▶️ 开始滚动
+                    <span class="btn-icon">▶</span> 开始滚动
                 </button>
                 <div class="autoscroll-controls">
                     <div class="autoscroll-speed-control">
-                        <label>速度: <span id="speed-value">${settings.speed}</span></label>
+                        <label>
+                            <span>速度</span>
+                            <span id="speed-value">${settings.speed}</span>
+                        </label>
                         <input type="range" id="autoscroll-speed" min="${CONFIG.MIN_SPEED}" max="${CONFIG.MAX_SPEED}" step="0.5" value="${settings.speed}">
                     </div>
                 </div>
@@ -139,123 +151,263 @@
 
         // 添加样式
         GM_addStyle(`
+            /* ===== Panel Container ===== */
             #linuxdo-autoscroll-panel {
                 position: fixed;
                 top: 100px;
                 right: 20px;
-                background: #ff7b00;
+                background: rgba(255, 255, 255, 0.78);
+                background: color-mix(in srgb, var(--secondary, #ffffff) 82%, transparent);
+                backdrop-filter: blur(24px) saturate(180%);
+                -webkit-backdrop-filter: blur(24px) saturate(180%);
                 padding: 0;
-                border-radius: 12px;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+                border-radius: 16px;
+                border: 1px solid rgba(0, 0, 0, 0.06);
+                border: 1px solid color-mix(in srgb, var(--primary, #000000) 6%, transparent);
+                box-shadow:
+                    0 8px 32px rgba(0, 0, 0, 0.08),
+                    0 2px 8px rgba(0, 0, 0, 0.04);
                 z-index: 99999;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                color: white;
+                color: var(--primary, #1a1a1a);
                 min-width: 200px;
-                transition: all 0.3s ease;
+                transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
                 cursor: move;
                 will-change: transform;
                 --tx: 0;
                 --ty: 0;
+                overflow: hidden;
             }
 
             #linuxdo-autoscroll-panel:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+                box-shadow:
+                    0 12px 40px rgba(0, 0, 0, 0.12),
+                    0 4px 12px rgba(0, 0, 0, 0.06);
+                transform: translate(var(--tx, 0), var(--ty, 0)) translateY(-1px);
             }
 
             #linuxdo-autoscroll-panel.dragging {
                 transition: none;
-                box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
                 transform: none;
                 animation: none !important;
             }
 
-
+            /* ===== Header ===== */
             .autoscroll-header {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                padding: 12px 15px;
-                border-bottom: 1px solid rgba(255,255,255,0.3);
+                padding: 10px 14px;
+                border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+                border-bottom: 1px solid color-mix(in srgb, var(--primary, #000000) 5%, transparent);
                 cursor: move;
                 user-select: none;
             }
 
             .autoscroll-title {
-                font-size: 14px;
-                font-weight: bold;
+                font-size: 13px;
+                font-weight: 600;
                 display: flex;
                 align-items: center;
-                gap: 6px;
+                gap: 7px;
+                color: var(--primary, #333);
+                letter-spacing: 0.2px;
             }
 
             .autoscroll-icon {
-                font-size: 14px;
+                display: flex;
+                align-items: center;
+                color: var(--tertiary, #4a90d9);
             }
 
-            #linuxdo-autoscroll-panel.minimized .autoscroll-title {
-                font-size: 18px;
-            }
-
-            #linuxdo-autoscroll-panel.minimized .autoscroll-icon {
-                font-size: 18px;
-            }
-
-
-            #linuxdo-autoscroll-panel.minimized .autoscroll-text {
-                display: none;
-            }
-
+            /* ===== Minimize Button ===== */
             .autoscroll-minimize-btn {
-                width: 24px;
-                height: 24px;
+                width: 22px;
+                height: 22px;
                 border: none;
-                background: rgba(255,255,255,0.2);
-                color: white;
-                border-radius: 4px;
+                background: rgba(0, 0, 0, 0.05);
+                background: color-mix(in srgb, var(--primary, #000000) 5%, transparent);
+                color: var(--primary, #666);
+                border-radius: 6px;
                 cursor: pointer;
-                font-size: 18px;
+                font-size: 16px;
                 line-height: 1;
                 padding: 0;
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 transition: all 0.2s ease;
+                opacity: 0.45;
             }
 
             .autoscroll-minimize-btn:hover {
-                background: rgba(255,255,255,0.3);
+                background: rgba(0, 0, 0, 0.1);
+                background: color-mix(in srgb, var(--primary, #000000) 10%, transparent);
+                opacity: 1;
                 transform: scale(1.1);
             }
 
+            /* ===== Content Area ===== */
             .autoscroll-content {
-                padding: 15px;
-                transition: all 0.3s ease;
+                padding: 12px 14px 14px;
             }
 
+            /* ===== Action Button ===== */
+            .autoscroll-btn {
+                width: 100%;
+                padding: 9px 16px;
+                border: none;
+                border-radius: 10px;
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+                margin-bottom: 10px;
+                letter-spacing: 0.3px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+            }
+
+            .autoscroll-btn .btn-icon {
+                font-size: 11px;
+            }
+
+            .autoscroll-btn-primary {
+                background: var(--tertiary, #4a90d9);
+                color: #fff;
+            }
+
+            .autoscroll-btn-primary:hover {
+                filter: brightness(1.1);
+                transform: scale(1.02);
+                box-shadow: 0 4px 14px rgba(74, 144, 217, 0.3);
+                box-shadow: 0 4px 14px color-mix(in srgb, var(--tertiary, #4a90d9) 30%, transparent);
+            }
+
+            .autoscroll-btn-primary:active {
+                transform: scale(0.97);
+                filter: brightness(0.95);
+            }
+
+            .autoscroll-btn-primary.scrolling-active {
+                background: #ef4444;
+            }
+
+            .autoscroll-btn-primary.scrolling-active:hover {
+                box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+            }
+
+            /* ===== Speed Control ===== */
+            .autoscroll-speed-control {
+                margin: 6px 0;
+            }
+
+            .autoscroll-speed-control label {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-size: 12px;
+                margin-bottom: 8px;
+                opacity: 0.55;
+                font-weight: 500;
+            }
+
+            .autoscroll-speed-control input[type="range"] {
+                width: 100%;
+                height: 4px;
+                border-radius: 2px;
+                background: rgba(0, 0, 0, 0.08);
+                background: color-mix(in srgb, var(--primary, #000000) 8%, transparent);
+                outline: none;
+                -webkit-appearance: none;
+                transition: background 0.2s;
+            }
+
+            .autoscroll-speed-control input[type="range"]::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: var(--tertiary, #4a90d9);
+                cursor: pointer;
+                box-shadow: 0 1px 6px rgba(74, 144, 217, 0.35);
+                transition: all 0.2s ease;
+                border: 2px solid #fff;
+            }
+
+            .autoscroll-speed-control input[type="range"]::-webkit-slider-thumb:hover {
+                transform: scale(1.2);
+            }
+
+            .autoscroll-speed-control input[type="range"]::-moz-range-thumb {
+                width: 14px;
+                height: 14px;
+                border-radius: 50%;
+                background: var(--tertiary, #4a90d9);
+                cursor: pointer;
+                border: 2px solid #fff;
+                box-shadow: 0 1px 6px rgba(74, 144, 217, 0.35);
+            }
+
+            .autoscroll-speed-control input[type="range"]::-moz-range-track {
+                height: 4px;
+                border-radius: 2px;
+                background: rgba(0, 0, 0, 0.08);
+                border: none;
+            }
+
+            /* ===== Status ===== */
+            .autoscroll-status {
+                font-size: 11px;
+                text-align: center;
+                opacity: 0.4;
+                margin-top: 8px;
+                padding-top: 8px;
+                border-top: 1px solid rgba(0, 0, 0, 0.05);
+                border-top: 1px solid color-mix(in srgb, var(--primary, #000000) 5%, transparent);
+                font-weight: 500;
+                letter-spacing: 0.3px;
+            }
+
+            /* ===== Minimized State ===== */
             #linuxdo-autoscroll-panel.minimized {
                 min-width: auto;
-                width: 40px;
-                height: 40px;
+                width: 42px;
+                height: 42px;
                 padding: 0;
                 border-radius: 50%;
                 cursor: pointer;
+                background: var(--tertiary, #4a90d9);
+                border: 2px solid rgba(255, 255, 255, 0.25);
+                box-shadow: 0 4px 16px rgba(74, 144, 217, 0.3);
+                box-shadow: 0 4px 16px color-mix(in srgb, var(--tertiary, #4a90d9) 30%, transparent);
             }
 
-            #linuxdo-autoscroll-panel.minimized.scrolling {
-                background: #ff7b00;
-                animation: linuxdo-autoscroll-pulse 1.4s ease-in-out infinite;
+            #linuxdo-autoscroll-panel.minimized:hover {
+                transform: translate(var(--tx, 0), var(--ty, 0)) scale(1.1);
+                box-shadow: 0 6px 24px rgba(74, 144, 217, 0.4);
+                box-shadow: 0 6px 24px color-mix(in srgb, var(--tertiary, #4a90d9) 45%, transparent);
             }
 
-            @keyframes linuxdo-autoscroll-pulse {
-                0%, 100% {
-                    transform: translate(var(--tx, 0), var(--ty, 0)) scale(1);
-                }
-                50% {
-                    transform: translate(var(--tx, 0), var(--ty, 0)) scale(1.15);
-                }
+            #linuxdo-autoscroll-panel.minimized .autoscroll-title {
+                font-size: 16px;
             }
 
+            #linuxdo-autoscroll-panel.minimized .autoscroll-icon {
+                color: #fff;
+            }
+
+            #linuxdo-autoscroll-panel.minimized .autoscroll-icon svg {
+                width: 18px;
+                height: 18px;
+            }
+
+            #linuxdo-autoscroll-panel.minimized .autoscroll-text {
+                display: none;
+            }
 
             #linuxdo-autoscroll-panel.minimized .autoscroll-content {
                 display: none;
@@ -275,68 +427,20 @@
                 display: none;
             }
 
-            .autoscroll-btn {
-                width: 100%;
-                padding: 10px;
-                border: none;
-                border-radius: 8px;
-                font-size: 14px;
-                font-weight: bold;
-                cursor: pointer;
-                transition: all 0.2s ease;
-                margin-bottom: 10px;
+            /* ===== Scrolling Pulse Animation ===== */
+            #linuxdo-autoscroll-panel.minimized.scrolling {
+                animation: linuxdo-autoscroll-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
             }
 
-            .autoscroll-btn-primary {
-                background: white;
-                color: #2d2d2d;
-            }
-
-            .autoscroll-btn-primary:hover {
-                background: #f0f0f0;
-                transform: scale(1.02);
-            }
-
-            .autoscroll-btn-primary:active {
-                transform: scale(0.98);
-            }
-
-            .autoscroll-speed-control {
-                margin: 10px 0;
-            }
-
-            .autoscroll-speed-control label {
-                display: block;
-                font-size: 12px;
-                margin-bottom: 5px;
-            }
-
-            .autoscroll-speed-control input[type="range"] {
-                width: 100%;
-                height: 6px;
-                border-radius: 3px;
-                background: rgba(255,255,255,0.3);
-                outline: none;
-                -webkit-appearance: none;
-            }
-
-            .autoscroll-speed-control input[type="range"]::-webkit-slider-thumb {
-                -webkit-appearance: none;
-                width: 16px;
-                height: 16px;
-                border-radius: 50%;
-                background: white;
-                cursor: pointer;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-            }
-
-            .autoscroll-status {
-                font-size: 11px;
-                text-align: center;
-                opacity: 0.8;
-                margin-top: 8px;
-                padding-top: 8px;
-                border-top: 1px solid rgba(255,255,255,0.2);
+            @keyframes linuxdo-autoscroll-pulse {
+                0%, 100% {
+                    transform: translate(var(--tx, 0), var(--ty, 0)) scale(1);
+                    box-shadow: 0 4px 16px rgba(74, 144, 217, 0.3);
+                }
+                50% {
+                    transform: translate(var(--tx, 0), var(--ty, 0)) scale(1.12);
+                    box-shadow: 0 8px 28px rgba(74, 144, 217, 0.5);
+                }
             }
         `);
 
@@ -461,7 +565,7 @@
         }
 
         function dragStart(e) {
-            if (e.target.classList.contains('autoscroll-minimize-btn')) {
+            if (e.target.closest('.autoscroll-minimize-btn')) {
                 return; // 如果点击的是最小化按钮，不拖拽
             }
 
@@ -571,8 +675,6 @@
             panel.classList.remove('minimized');
         }
 
-        minimizeBtn.textContent = isMinimized ? '+' : '−';
-        minimizeBtn.title = isMinimized ? '展开' : '最小化';
         settings.isMinimized = isMinimized;
         StorageManager.save(settings);
     }
@@ -587,7 +689,7 @@
     // 双击标题栏也可以最小化/展开
     const header = document.getElementById('autoscroll-header');
     header.addEventListener('dblclick', (e) => {
-        if (e.target !== minimizeBtn) {
+        if (!e.target.closest('.autoscroll-minimize-btn')) {
             toggleMinimize();
         }
     });
@@ -599,7 +701,7 @@
             return;
         }
 
-        if (panel.classList.contains('minimized') && e.target !== minimizeBtn) {
+        if (panel.classList.contains('minimized') && !e.target.closest('.autoscroll-minimize-btn')) {
             toggleMinimize(false);
         }
     });
@@ -632,12 +734,11 @@
         noChangeCount = 0; // 重置无变化计数
         lastScrollHeight = document.documentElement.scrollHeight; // 初始化高度
         lastFrameTime = performance.now();
-        toggleBtn.textContent = '⏸️ 暂停滚动';
-        toggleBtn.style.background = '#ff6b6b';
-        toggleBtn.style.color = 'white';
+        toggleBtn.innerHTML = '<span class="btn-icon">⏸</span> 暂停滚动';
+        toggleBtn.classList.add('scrolling-active');
         statusDiv.textContent = '正在滚动...';
 
-        // 最小化状态时显示绿色
+        // 最小化状态时显示脉冲动画
         panel.classList.add('scrolling');
 
         // 滚动动画
@@ -698,12 +799,11 @@
     // 停止滚动
     function stopScroll() {
         isScrolling = false;
-        toggleBtn.textContent = '▶️ 继续滚动';
-        toggleBtn.style.background = 'white';
-        toggleBtn.style.color = '#2d2d2d';
+        toggleBtn.innerHTML = '<span class="btn-icon">▶</span> 继续滚动';
+        toggleBtn.classList.remove('scrolling-active');
         statusDiv.textContent = '已暂停';
 
-        // 移除绿色，恢复默认颜色
+        // 移除脉冲动画
         panel.classList.remove('scrolling');
 
         if (scrollRafId !== null) {
@@ -767,6 +867,6 @@
         });
     }
 
-    console.log('🚀 Linux.do 自动滚动助手已加载！');
-    console.log('💡 快捷键: Alt+S 开始/暂停, Alt+↑/↓ 调整速度');
+    console.log('Linux.do 自动滚动助手已加载');
+    console.log('快捷键: Alt+S 开始/暂停, Alt+↑/↓ 调整速度');
 })();
